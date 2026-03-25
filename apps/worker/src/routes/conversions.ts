@@ -8,6 +8,8 @@ import {
   getConversionEvents,
   getConversionReport,
 } from '@line-crm/db';
+import { sendMetaConversionEvent } from '../services/meta-conversions.js';
+import { sendGoogleConversionEvent } from '../services/google-conversions.js';
 import type { Env } from '../index.js';
 
 const conversions = new Hono<Env>();
@@ -25,6 +27,14 @@ conversions.get('/api/conversions/points', async (c) => {
         name: p.name,
         eventType: p.event_type,
         value: p.value,
+        publicToken: p.public_token,
+        metaPixelId: p.meta_pixel_id,
+        metaAccessToken: p.meta_access_token,
+        metaEventName: p.meta_event_name,
+        metaTestEventCode: p.meta_test_event_code,
+        googleMeasurementId: p.google_measurement_id,
+        googleApiSecret: p.google_api_secret,
+        googleEventName: p.google_event_name,
         createdAt: p.created_at,
       })),
     });
@@ -41,6 +51,13 @@ conversions.post('/api/conversions/points', async (c) => {
       name: string;
       eventType: string;
       value?: number | null;
+      metaPixelId?: string | null;
+      metaAccessToken?: string | null;
+      metaEventName?: string | null;
+      metaTestEventCode?: string | null;
+      googleMeasurementId?: string | null;
+      googleApiSecret?: string | null;
+      googleEventName?: string | null;
     }>();
 
     if (!body.name || !body.eventType) {
@@ -55,6 +72,14 @@ conversions.post('/api/conversions/points', async (c) => {
         name: point.name,
         eventType: point.event_type,
         value: point.value,
+        publicToken: point.public_token,
+        metaPixelId: point.meta_pixel_id,
+        metaAccessToken: point.meta_access_token,
+        metaEventName: point.meta_event_name,
+        metaTestEventCode: point.meta_test_event_code,
+        googleMeasurementId: point.google_measurement_id,
+        googleApiSecret: point.google_api_secret,
+        googleEventName: point.google_event_name,
         createdAt: point.created_at,
       },
     }, 201);
@@ -95,13 +120,42 @@ conversions.post('/api/conversions/track', async (c) => {
       );
     }
 
-    const event = await trackConversion(c.env.DB, {
-      conversionPointId: body.conversionPointId,
-      friendId: body.friendId,
-      userId: body.userId,
-      affiliateCode: body.affiliateCode,
-      metadata: body.metadata ? JSON.stringify(body.metadata) : null,
-    });
+    const [event, point] = await Promise.all([
+      trackConversion(c.env.DB, {
+        conversionPointId: body.conversionPointId,
+        friendId: body.friendId,
+        userId: body.userId,
+        affiliateCode: body.affiliateCode,
+        metadata: body.metadata ? JSON.stringify(body.metadata) : null,
+      }),
+      getConversionPointById(c.env.DB, body.conversionPointId),
+    ]);
+
+    if (point?.meta_pixel_id && point.meta_access_token && point.meta_event_name) {
+      c.executionCtx.waitUntil(
+        sendMetaConversionEvent({
+          pixelId: point.meta_pixel_id,
+          accessToken: point.meta_access_token,
+          eventName: point.meta_event_name,
+          eventTime: Math.floor(Date.now() / 1000),
+          lineUserId: body.friendId,
+          value: point.value,
+          testEventCode: point.meta_test_event_code,
+        }),
+      );
+    }
+
+    if (point?.google_measurement_id && point.google_api_secret && point.google_event_name) {
+      c.executionCtx.waitUntil(
+        sendGoogleConversionEvent({
+          measurementId: point.google_measurement_id,
+          apiSecret: point.google_api_secret,
+          eventName: point.google_event_name,
+          lineUserId: body.friendId,
+          value: point.value,
+        }),
+      );
+    }
 
     return c.json({
       success: true,
