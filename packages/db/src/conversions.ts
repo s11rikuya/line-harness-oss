@@ -8,6 +8,14 @@ export interface ConversionPoint {
   name: string;
   event_type: string;
   value: number | null;
+  public_token: string | null;
+  meta_pixel_id: string | null;
+  meta_access_token: string | null;
+  meta_event_name: string | null;
+  meta_test_event_code: string | null;
+  google_measurement_id: string | null;
+  google_api_secret: string | null;
+  google_event_name: string | null;
   created_at: string;
 }
 
@@ -40,10 +48,62 @@ export async function getConversionPointById(
     .first<ConversionPoint>();
 }
 
+export async function getConversionPointByToken(
+  db: D1Database,
+  token: string,
+): Promise<ConversionPoint | null> {
+  return db
+    .prepare(`SELECT * FROM conversion_points WHERE public_token = ?`)
+    .bind(token)
+    .first<ConversionPoint>();
+}
+
+export interface CvTagHit {
+  id: string;
+  conversion_point_id: string;
+  visitor_id: string | null;
+  page_url: string | null;
+  ref: string | null;
+  created_at: string;
+}
+
+export async function recordCvTagHit(
+  db: D1Database,
+  input: {
+    conversionPointId: string;
+    visitorId?: string | null;
+    pageUrl?: string | null;
+    ref?: string | null;
+  },
+): Promise<CvTagHit> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+
+  await db
+    .prepare(
+      `INSERT INTO cv_tag_hits (id, conversion_point_id, visitor_id, page_url, ref, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(id, input.conversionPointId, input.visitorId ?? null, input.pageUrl ?? null, input.ref ?? null, now)
+    .run();
+
+  return (await db
+    .prepare(`SELECT * FROM cv_tag_hits WHERE id = ?`)
+    .bind(id)
+    .first<CvTagHit>())!;
+}
+
 export interface CreateConversionPointInput {
   name: string;
   eventType: string;
   value?: number | null;
+  metaPixelId?: string | null;
+  metaAccessToken?: string | null;
+  metaEventName?: string | null;
+  metaTestEventCode?: string | null;
+  googleMeasurementId?: string | null;
+  googleApiSecret?: string | null;
+  googleEventName?: string | null;
 }
 
 export async function createConversionPoint(
@@ -55,10 +115,24 @@ export async function createConversionPoint(
 
   await db
     .prepare(
-      `INSERT INTO conversion_points (id, name, event_type, value, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO conversion_points (id, name, event_type, value, public_token, meta_pixel_id, meta_access_token, meta_event_name, meta_test_event_code, google_measurement_id, google_api_secret, google_event_name, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.eventType, input.value ?? null, now)
+    .bind(
+      id,
+      input.name,
+      input.eventType,
+      input.value ?? null,
+      crypto.randomUUID(),
+      input.metaPixelId ?? null,
+      input.metaAccessToken ?? null,
+      input.metaEventName ?? null,
+      input.metaTestEventCode ?? null,
+      input.googleMeasurementId ?? null,
+      input.googleApiSecret ?? null,
+      input.googleEventName ?? null,
+      now,
+    )
     .run();
 
   return (await getConversionPointById(db, id))!;

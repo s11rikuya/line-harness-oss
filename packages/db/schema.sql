@@ -186,12 +186,35 @@ CREATE TABLE IF NOT EXISTS line_accounts (
 -- Round 2: Conversion Points (CV Tracking)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS conversion_points (
-  id         TEXT PRIMARY KEY,
-  name       TEXT NOT NULL,
-  event_type TEXT NOT NULL,
-  value      REAL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  id                     TEXT PRIMARY KEY,
+  name                   TEXT NOT NULL,
+  event_type             TEXT NOT NULL,
+  value                  REAL,
+  public_token           TEXT UNIQUE,
+  meta_pixel_id          TEXT,
+  meta_access_token      TEXT,
+  meta_event_name        TEXT,
+  meta_test_event_code   TEXT,
+  google_measurement_id  TEXT,
+  google_api_secret      TEXT,
+  google_event_name      TEXT,
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
+
+-- ============================================================
+-- CV Tag Hits — website tag-triggered anonymous conversions
+-- ============================================================
+CREATE TABLE IF NOT EXISTS cv_tag_hits (
+  id                  TEXT PRIMARY KEY,
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points (id) ON DELETE CASCADE,
+  visitor_id          TEXT,
+  page_url            TEXT,
+  ref                 TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_cv_tag_hits_point ON cv_tag_hits (conversion_point_id);
+CREATE INDEX IF NOT EXISTS idx_cv_tag_hits_created ON cv_tag_hits (created_at);
 
 -- ============================================================
 -- Round 2: Conversion Events (CV Records)

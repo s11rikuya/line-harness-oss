@@ -328,6 +328,22 @@ export interface ConversionPoint {
   eventType: string;
   /** 金額 (任意) */
   value: number | null;
+  /** タグ埋め込み用公開トークン */
+  publicToken: string | null;
+  /** Meta Pixel ID */
+  metaPixelId: string | null;
+  /** Meta Conversions API アクセストークン */
+  metaAccessToken: string | null;
+  /** Meta 標準イベント名 (Purchase, Lead 等) */
+  metaEventName: string | null;
+  /** Meta テストイベントコード (任意) */
+  metaTestEventCode: string | null;
+  /** GA4 Measurement ID (G-XXXXXXXX) */
+  googleMeasurementId: string | null;
+  /** GA4 Measurement Protocol API Secret */
+  googleApiSecret: string | null;
+  /** GA4 イベント名 (purchase, generate_lead 等) */
+  googleEventName: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
