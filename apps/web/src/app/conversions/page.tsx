@@ -33,12 +33,34 @@ const ccPrompts = [
   },
 ]
 
+const WORKER_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
+
+function buildJsTag(token: string) {
+  return `<script>(function(){fetch('${WORKER_URL}/cv/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitor_id:Math.random().toString(36).slice(2),url:location.href,ref:new URLSearchParams(location.search).get('ref')})}).catch(function(){});})();<\/script>`
+}
+
+function buildPixelTag(token: string) {
+  return `<img src="${WORKER_URL}/cv/${token}?vid=${encodeURIComponent(Math.random().toString(36).slice(2))}&url=" width="1" height="1" style="display:none" alt="">`
+}
+
 export default function ConversionsPage() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', eventType: '', value: '' })
+  const [tagPointId, setTagPointId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: '',
+    eventType: '',
+    value: '',
+    metaPixelId: '',
+    metaAccessToken: '',
+    metaEventName: '',
+    metaTestEventCode: '',
+    googleMeasurementId: '',
+    googleApiSecret: '',
+    googleEventName: '',
+  })
 
   const load = async () => {
     setLoading(true)
@@ -63,8 +85,15 @@ export default function ConversionsPage() {
         name: form.name,
         eventType: form.eventType,
         value: form.value ? Number(form.value) : null,
+        metaPixelId: form.metaPixelId || null,
+        metaAccessToken: form.metaAccessToken || null,
+        metaEventName: form.metaEventName || null,
+        metaTestEventCode: form.metaTestEventCode || null,
+        googleMeasurementId: form.googleMeasurementId || null,
+        googleApiSecret: form.googleApiSecret || null,
+        googleEventName: form.googleEventName || null,
       })
-      setForm({ name: '', eventType: '', value: '' })
+      setForm({ name: '', eventType: '', value: '', metaPixelId: '', metaAccessToken: '', metaEventName: '', metaTestEventCode: '', googleMeasurementId: '', googleApiSecret: '', googleEventName: '' })
       setShowCreate(false)
       load()
     } catch {}
@@ -141,6 +170,109 @@ export default function ConversionsPage() {
                 placeholder="0"
               />
             </div>
+            <div className="col-span-full mt-2 border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span className="w-4 h-4 rounded bg-blue-600 text-white text-center leading-4 text-[10px] font-bold">f</span>
+              Meta Conversions API（任意）
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pixel ID</label>
+                <input
+                  value={form.metaPixelId}
+                  onChange={(e) => setForm({ ...form, metaPixelId: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="123456789012345"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">アクセストークン</label>
+                <input
+                  type="password"
+                  value={form.metaAccessToken}
+                  onChange={(e) => setForm({ ...form, metaAccessToken: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="EAAxxxxxxxx..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meta イベント名</label>
+                <select
+                  value={form.metaEventName}
+                  onChange={(e) => setForm({ ...form, metaEventName: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">選択...</option>
+                  <option value="Purchase">Purchase（購入）</option>
+                  <option value="Lead">Lead（リード）</option>
+                  <option value="CompleteRegistration">CompleteRegistration（登録完了）</option>
+                  <option value="InitiateCheckout">InitiateCheckout（チェックアウト開始）</option>
+                  <option value="AddToCart">AddToCart（カートに追加）</option>
+                  <option value="ViewContent">ViewContent（コンテンツ閲覧）</option>
+                  <option value="Search">Search（検索）</option>
+                  <option value="Contact">Contact（問い合わせ）</option>
+                  <option value="Subscribe">Subscribe（購読）</option>
+                  <option value="CustomEvent">CustomEvent（カスタム）</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">テストイベントコード（任意）</label>
+                <input
+                  value={form.metaTestEventCode}
+                  onChange={(e) => setForm({ ...form, metaTestEventCode: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="TEST12345"
+                />
+              </div>
+            </div>
+          </div>
+
+            <div className="col-span-full mt-2 border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span className="w-4 h-4 rounded bg-white border border-gray-300 flex items-center justify-center text-[10px] font-bold text-blue-500">G</span>
+              Google Analytics 4（任意）
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Measurement ID</label>
+                <input
+                  value={form.googleMeasurementId}
+                  onChange={(e) => setForm({ ...form, googleMeasurementId: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="G-XXXXXXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">API Secret</label>
+                <input
+                  type="password"
+                  value={form.googleApiSecret}
+                  onChange={(e) => setForm({ ...form, googleApiSecret: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="xxxxxxxxxxxxxxxxxx"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GA4 イベント名</label>
+                <select
+                  value={form.googleEventName}
+                  onChange={(e) => setForm({ ...form, googleEventName: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">選択...</option>
+                  <option value="purchase">purchase（購入）</option>
+                  <option value="generate_lead">generate_lead（リード獲得）</option>
+                  <option value="sign_up">sign_up（登録）</option>
+                  <option value="begin_checkout">begin_checkout（チェックアウト開始）</option>
+                  <option value="add_to_cart">add_to_cart（カートに追加）</option>
+                  <option value="view_item">view_item（商品閲覧）</option>
+                  <option value="search">search（検索）</option>
+                  <option value="contact">contact（問い合わせ）</option>
+                  <option value="subscribe">subscribe（購読）</option>
+                </select>
+              </div>
+            </div>
+          </div>
           </div>
           <button
             type="submit"
@@ -206,7 +338,15 @@ export default function ConversionsPage() {
                     {point.value !== null ? `¥${point.value.toLocaleString()}` : '-'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{new Date(point.createdAt).toLocaleDateString('ja-JP')}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                    {point.publicToken && (
+                      <button
+                        onClick={() => setTagPointId(point.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        タグ
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(point.id)}
                       className="text-red-500 hover:text-red-700 text-sm"
@@ -220,6 +360,58 @@ export default function ConversionsPage() {
           </table>
         </div>
       )}
+
+      {/* Tag Code Modal */}
+      {tagPointId && (() => {
+        const p = points.find((x) => x.id === tagPointId)
+        if (!p || !p.publicToken) return null
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+              <div className="flex items-center justify-between p-5 border-b border-gray-200">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">タグ埋め込みコード</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{p.name} — CV発生ページのHTMLに貼り付けてください</p>
+                </div>
+                <button onClick={() => setTagPointId(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <div className="p-5 space-y-5">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-sm font-medium text-gray-700">JS タグ（推奨）</p>
+                    <span className="text-xs text-green-600 font-medium">ITP 回避 / Safari 対応</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2">fetch でサーバー側に送信するため、iPhone / Safari の ITP・ブラウザ制限の影響を受けません。</p>
+                  <div className="relative">
+                    <pre className="bg-gray-900 text-green-400 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap break-all">{buildJsTag(p.publicToken)}</pre>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(buildJsTag(p.publicToken!))}
+                      className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded"
+                    >コピー</button>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-sm font-medium text-gray-700">ピクセルタグ（img 版）</p>
+                    <span className="text-xs text-gray-400">JS 無効環境向け</span>
+                  </div>
+                  <div className="relative">
+                    <pre className="bg-gray-900 text-green-400 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap break-all">{buildPixelTag(p.publicToken)}</pre>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(buildPixelTag(p.publicToken!))}
+                      className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded"
+                    >コピー</button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+                  タグが発火すると Meta / Google への送信も自動で行われます。設定した広告プラットフォームがなければ line-harness 内部の CV 記録のみ行います。
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <CcPromptButton prompts={ccPrompts} />
     </div>
   )

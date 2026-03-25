@@ -232,7 +232,18 @@ export const api = {
   conversions: {
     points: () =>
       fetchApi<ApiResponse<ConversionPoint[]>>('/api/conversions/points'),
-    createPoint: (data: { name: string; eventType: string; value?: number | null }) =>
+    createPoint: (data: {
+      name: string;
+      eventType: string;
+      value?: number | null;
+      metaPixelId?: string | null;
+      metaAccessToken?: string | null;
+      metaEventName?: string | null;
+      metaTestEventCode?: string | null;
+      googleMeasurementId?: string | null;
+      googleApiSecret?: string | null;
+      googleEventName?: string | null;
+    }) =>
       fetchApi<ApiResponse<ConversionPoint>>('/api/conversions/points', {
         method: 'POST',
         body: JSON.stringify(data),
