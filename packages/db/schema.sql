@@ -202,19 +202,15 @@ CREATE TABLE IF NOT EXISTS conversion_points (
 );
 
 -- ============================================================
--- CV Tag Hits — website tag-triggered anonymous conversions
+-- CV Point Tags — tags to auto-assign when a CV tag fires
 -- ============================================================
-CREATE TABLE IF NOT EXISTS cv_tag_hits (
-  id                  TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS conversion_point_tags (
   conversion_point_id TEXT NOT NULL REFERENCES conversion_points (id) ON DELETE CASCADE,
-  visitor_id          TEXT,
-  page_url            TEXT,
-  ref                 TEXT,
-  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  tag_id              TEXT NOT NULL REFERENCES tags (id) ON DELETE CASCADE,
+  PRIMARY KEY (conversion_point_id, tag_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cv_tag_hits_point ON cv_tag_hits (conversion_point_id);
-CREATE INDEX IF NOT EXISTS idx_cv_tag_hits_created ON cv_tag_hits (created_at);
+CREATE INDEX IF NOT EXISTS idx_cv_point_tags_point ON conversion_point_tags (conversion_point_id);
 
 -- ============================================================
 -- Round 2: Conversion Events (CV Records)

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
+import type { Tag } from '@line-crm/shared'
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 
@@ -36,15 +37,16 @@ const ccPrompts = [
 const WORKER_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
 
 function buildJsTag(token: string) {
-  return `<script>(function(){fetch('${WORKER_URL}/cv/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitor_id:Math.random().toString(36).slice(2),url:location.href,ref:new URLSearchParams(location.search).get('ref')})}).catch(function(){});})();<\/script>`
+  return `<script>(function(){fetch('${WORKER_URL}/cv/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:location.href,ref:new URLSearchParams(location.search).get('ref')})}).catch(function(){});})();<\/script>`
 }
 
 function buildPixelTag(token: string) {
-  return `<img src="${WORKER_URL}/cv/${token}?vid=${encodeURIComponent(Math.random().toString(36).slice(2))}&url=" width="1" height="1" style="display:none" alt="">`
+  return `<img src="${WORKER_URL}/cv/${token}?ref=" width="1" height="1" style="display:none" alt="">`
 }
 
 export default function ConversionsPage() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -53,6 +55,7 @@ export default function ConversionsPage() {
     name: '',
     eventType: '',
     value: '',
+    tagIds: [] as string[],
     metaPixelId: '',
     metaAccessToken: '',
     metaEventName: '',
@@ -65,12 +68,14 @@ export default function ConversionsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [pointsRes, reportRes] = await Promise.allSettled([
+      const [pointsRes, reportRes, tagsRes] = await Promise.allSettled([
         api.conversions.points(),
         api.conversions.report(),
+        api.tags.list(),
       ])
       if (pointsRes.status === 'fulfilled' && pointsRes.value.success) setPoints(pointsRes.value.data)
       if (reportRes.status === 'fulfilled' && reportRes.value.success) setReport(reportRes.value.data)
+      if (tagsRes.status === 'fulfilled' && tagsRes.value.success) setTags(tagsRes.value.data)
     } catch {}
     setLoading(false)
   }
@@ -85,6 +90,7 @@ export default function ConversionsPage() {
         name: form.name,
         eventType: form.eventType,
         value: form.value ? Number(form.value) : null,
+        tagIds: form.tagIds,
         metaPixelId: form.metaPixelId || null,
         metaAccessToken: form.metaAccessToken || null,
         metaEventName: form.metaEventName || null,
@@ -93,7 +99,7 @@ export default function ConversionsPage() {
         googleApiSecret: form.googleApiSecret || null,
         googleEventName: form.googleEventName || null,
       })
-      setForm({ name: '', eventType: '', value: '', metaPixelId: '', metaAccessToken: '', metaEventName: '', metaTestEventCode: '', googleMeasurementId: '', googleApiSecret: '', googleEventName: '' })
+      setForm({ name: '', eventType: '', value: '', tagIds: [], metaPixelId: '', metaAccessToken: '', metaEventName: '', metaTestEventCode: '', googleMeasurementId: '', googleApiSecret: '', googleEventName: '' })
       setShowCreate(false)
       load()
     } catch {}
@@ -170,6 +176,32 @@ export default function ConversionsPage() {
                 placeholder="0"
               />
             </div>
+            {tags.length > 0 && (
+              <div className="col-span-full">
+                <label className="block text-sm font-medium text-gray-700 mb-2">CV 発火時に付与するタグ（複数選択可）</label>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const selected = form.tagIds.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => setForm({
+                          ...form,
+                          tagIds: selected
+                            ? form.tagIds.filter((id) => id !== tag.id)
+                            : [...form.tagIds, tag.id],
+                        })}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${selected ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}
+                        style={selected ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
+                      >
+                        {tag.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <div className="col-span-full mt-2 border-t border-gray-100 pt-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
               <span className="w-4 h-4 rounded bg-blue-600 text-white text-center leading-4 text-[10px] font-bold">f</span>
@@ -322,6 +354,7 @@ export default function ConversionsPage() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CV名</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">イベントタイプ</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">付与タグ</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">金額</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">作成日</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
@@ -333,6 +366,19 @@ export default function ConversionsPage() {
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{point.name}</td>
                   <td className="px-4 py-3">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{point.eventType}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {point.tagIds?.length > 0
+                        ? point.tagIds.map((tid) => {
+                            const t = tags.find((x) => x.id === tid)
+                            return t ? (
+                              <span key={tid} className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+                            ) : null
+                          })
+                        : <span className="text-xs text-gray-400">-</span>
+                      }
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {point.value !== null ? `¥${point.value.toLocaleString()}` : '-'}
@@ -403,8 +449,8 @@ export default function ConversionsPage() {
                     >コピー</button>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
-                  タグが発火すると Meta / Google への送信も自動で行われます。設定した広告プラットフォームがなければ line-harness 内部の CV 記録のみ行います。
+                  <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+                  LINE メッセージのリンクに <code className="bg-gray-200 px-1 rounded">?ref=xxx</code> パラメータを付けておくと、ページ訪問時に LINE ユーザーを特定し、設定したタグを自動付与します。ref がない場合は記録のみ行います。
                 </p>
               </div>
             </div>

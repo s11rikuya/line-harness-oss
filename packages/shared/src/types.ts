@@ -330,6 +330,8 @@ export interface ConversionPoint {
   value: number | null;
   /** タグ埋め込み用公開トークン */
   publicToken: string | null;
+  /** CV 発火時に自動付与するタグ ID 一覧 */
+  tagIds: string[];
   /** Meta Pixel ID */
   metaPixelId: string | null;
   /** Meta Conversions API アクセストークン */

@@ -7,6 +7,7 @@ import {
   trackConversion,
   getConversionEvents,
   getConversionReport,
+  getConversionPointTagIds,
 } from '@line-crm/db';
 import { sendMetaConversionEvent } from '../services/meta-conversions.js';
 import { sendGoogleConversionEvent } from '../services/google-conversions.js';
@@ -20,14 +21,16 @@ const conversions = new Hono<Env>();
 conversions.get('/api/conversions/points', async (c) => {
   try {
     const items = await getConversionPoints(c.env.DB);
+    const tagIdsList = await Promise.all(items.map((p) => getConversionPointTagIds(c.env.DB, p.id)));
     return c.json({
       success: true,
-      data: items.map((p) => ({
+      data: items.map((p, i) => ({
         id: p.id,
         name: p.name,
         eventType: p.event_type,
         value: p.value,
         publicToken: p.public_token,
+        tagIds: tagIdsList[i],
         metaPixelId: p.meta_pixel_id,
         metaAccessToken: p.meta_access_token,
         metaEventName: p.meta_event_name,
@@ -51,6 +54,7 @@ conversions.post('/api/conversions/points', async (c) => {
       name: string;
       eventType: string;
       value?: number | null;
+      tagIds?: string[];
       metaPixelId?: string | null;
       metaAccessToken?: string | null;
       metaEventName?: string | null;
@@ -73,6 +77,7 @@ conversions.post('/api/conversions/points', async (c) => {
         eventType: point.event_type,
         value: point.value,
         publicToken: point.public_token,
+        tagIds: body.tagIds ?? [],
         metaPixelId: point.meta_pixel_id,
         metaAccessToken: point.meta_access_token,
         metaEventName: point.meta_event_name,

@@ -58,45 +58,12 @@ export async function getConversionPointByToken(
     .first<ConversionPoint>();
 }
 
-export interface CvTagHit {
-  id: string;
-  conversion_point_id: string;
-  visitor_id: string | null;
-  page_url: string | null;
-  ref: string | null;
-  created_at: string;
-}
-
-export async function recordCvTagHit(
-  db: D1Database,
-  input: {
-    conversionPointId: string;
-    visitorId?: string | null;
-    pageUrl?: string | null;
-    ref?: string | null;
-  },
-): Promise<CvTagHit> {
-  const id = crypto.randomUUID();
-  const now = jstNow();
-
-  await db
-    .prepare(
-      `INSERT INTO cv_tag_hits (id, conversion_point_id, visitor_id, page_url, ref, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(id, input.conversionPointId, input.visitorId ?? null, input.pageUrl ?? null, input.ref ?? null, now)
-    .run();
-
-  return (await db
-    .prepare(`SELECT * FROM cv_tag_hits WHERE id = ?`)
-    .bind(id)
-    .first<CvTagHit>())!;
-}
 
 export interface CreateConversionPointInput {
   name: string;
   eventType: string;
   value?: number | null;
+  tagIds?: string[];
   metaPixelId?: string | null;
   metaAccessToken?: string | null;
   metaEventName?: string | null;
@@ -135,7 +102,27 @@ export async function createConversionPoint(
     )
     .run();
 
+  if (input.tagIds && input.tagIds.length > 0) {
+    const stmts = input.tagIds.map((tagId) =>
+      db
+        .prepare(`INSERT OR IGNORE INTO conversion_point_tags (conversion_point_id, tag_id) VALUES (?, ?)`)
+        .bind(id, tagId),
+    );
+    await db.batch(stmts);
+  }
+
   return (await getConversionPointById(db, id))!;
+}
+
+export async function getConversionPointTagIds(
+  db: D1Database,
+  conversionPointId: string,
+): Promise<string[]> {
+  const result = await db
+    .prepare(`SELECT tag_id FROM conversion_point_tags WHERE conversion_point_id = ?`)
+    .bind(conversionPointId)
+    .all<{ tag_id: string }>();
+  return result.results.map((r) => r.tag_id);
 }
 
 export async function deleteConversionPoint(

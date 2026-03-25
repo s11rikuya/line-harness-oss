@@ -236,6 +236,7 @@ export const api = {
       name: string;
       eventType: string;
       value?: number | null;
+      tagIds?: string[];
       metaPixelId?: string | null;
       metaAccessToken?: string | null;
       metaEventName?: string | null;
