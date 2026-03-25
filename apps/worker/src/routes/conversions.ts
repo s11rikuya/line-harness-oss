@@ -108,29 +108,55 @@ conversions.delete('/api/conversions/points/:id', async (c) => {
 // ── Conversion Tracking ─────────────────────────────────────────────────────
 
 // POST /api/conversions/track - record conversion
+// Accepts either friendId (direct) or ref (LINE tracking code stored server-side).
+// Use ref when calling from an external server (e.g. Stripe webhook) where the
+// friendId is unknown but the ref was saved on the original page visit.
 conversions.post('/api/conversions/track', async (c) => {
   try {
     const body = await c.req.json<{
       conversionPointId: string;
-      friendId: string;
+      friendId?: string | null;
+      ref?: string | null;
       userId?: string | null;
       affiliateCode?: string | null;
       metadata?: Record<string, unknown> | null;
     }>();
 
-    if (!body.conversionPointId || !body.friendId) {
+    if (!body.conversionPointId) {
+      return c.json({ success: false, error: 'conversionPointId is required' }, 400);
+    }
+    if (!body.friendId && !body.ref) {
       return c.json(
-        { success: false, error: 'conversionPointId and friendId are required' },
+        { success: false, error: 'Either friendId or ref is required' },
         400,
       );
+    }
+
+    // ref から friend_id を解決
+    let friendId = body.friendId ?? null;
+    if (!friendId && body.ref) {
+      const tracking = await c.env.DB
+        .prepare(
+          `SELECT friend_id FROM ref_tracking WHERE ref_code = ? AND friend_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(body.ref)
+        .first<{ friend_id: string }>();
+
+      if (!tracking?.friend_id) {
+        return c.json(
+          { success: false, error: `No LINE user found for ref: ${body.ref}` },
+          404,
+        );
+      }
+      friendId = tracking.friend_id;
     }
 
     const [event, point] = await Promise.all([
       trackConversion(c.env.DB, {
         conversionPointId: body.conversionPointId,
-        friendId: body.friendId,
+        friendId: friendId!,
         userId: body.userId,
-        affiliateCode: body.affiliateCode,
+        affiliateCode: body.affiliateCode ?? body.ref ?? null,
         metadata: body.metadata ? JSON.stringify(body.metadata) : null,
       }),
       getConversionPointById(c.env.DB, body.conversionPointId),
@@ -143,7 +169,7 @@ conversions.post('/api/conversions/track', async (c) => {
           accessToken: point.meta_access_token,
           eventName: point.meta_event_name,
           eventTime: Math.floor(Date.now() / 1000),
-          lineUserId: body.friendId,
+          lineUserId: friendId!,
           value: point.value,
           testEventCode: point.meta_test_event_code,
         }),
@@ -156,7 +182,7 @@ conversions.post('/api/conversions/track', async (c) => {
           measurementId: point.google_measurement_id,
           apiSecret: point.google_api_secret,
           eventName: point.google_event_name,
-          lineUserId: body.friendId,
+          lineUserId: friendId!,
           value: point.value,
         }),
       );
